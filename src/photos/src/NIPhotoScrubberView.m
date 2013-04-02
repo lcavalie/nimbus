@@ -20,13 +20,23 @@
 
 #import <QuartzCore/QuartzCore.h>
 
-static const NSInteger NIPhotoScrubberViewUnknownTag = -1;
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
 
+static const NSInteger NIPhotoScrubberViewUnknownTag = -1;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 @interface NIPhotoScrubberView()
+
+/**
+ * @internal
+ *
+ * A method to encapsulate initilization logic that can be shared by different init methods.
+ */
+- (void)initializeScrubber;
 
 /**
  * @internal
@@ -63,23 +73,26 @@ static const NSInteger NIPhotoScrubberViewUnknownTag = -1;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)dealloc {
-  NI_RELEASE_SAFELY(_visiblePhotoViews);
-  NI_RELEASE_SAFELY(_recycledPhotoViews);
-  
-  NI_RELEASE_SAFELY(_containerView);
-  NI_RELEASE_SAFELY(_selectionView);
-
-  [super dealloc];
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
 - (id)initWithFrame:(CGRect)frame {
   if ((self = [super initWithFrame:frame])) {
+      [self initializeScrubber];
+  }
+
+  return self;
+}
+
+- (id)initWithCoder:(NSCoder *)aDecoder {
+    if ((self = [super initWithCoder:aDecoder])) {
+        [self initializeScrubber];
+    }
+    
+    return self;
+}
+
+- (void)initializeScrubber {
     // Only one finger should be allowed to interact with the scrubber at a time.
     self.multipleTouchEnabled = NO;
-
+    
     _containerView = [[UIView alloc] init];
     _containerView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.1f].CGColor;
     _containerView.layer.borderWidth = 1;
@@ -87,15 +100,11 @@ static const NSInteger NIPhotoScrubberViewUnknownTag = -1;
     _containerView.userInteractionEnabled = NO;
     [self addSubview:_containerView];
     
-    _selectionView = [[self photoView] retain];
+    _selectionView = [self photoView];
     [self addSubview:_selectionView];
-
+    
     _selectedPhotoIndex = -1;
-  }
-
-  return self;
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,7 +114,7 @@ static const NSInteger NIPhotoScrubberViewUnknownTag = -1;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (UIImageView *)photoView {
-  UIImageView* imageView = [[[UIImageView alloc] init] autorelease];
+  UIImageView* imageView = [[UIImageView alloc] init];
   
   imageView.layer.borderColor = [UIColor whiteColor].CGColor;
   imageView.layer.borderWidth = 1;
@@ -299,7 +308,7 @@ static const NSInteger NIPhotoScrubberViewUnknownTag = -1;
   [self layoutIfNeeded];
 
   // Recycle any views that we no longer need.
-  while ([_visiblePhotoViews count] > _numberOfVisiblePhotos) {
+  while ([_visiblePhotoViews count] > (NSUInteger)_numberOfVisiblePhotos) {
     UIView* photoView = [_visiblePhotoViews lastObject];
     [photoView removeFromSuperview];
 
@@ -309,14 +318,14 @@ static const NSInteger NIPhotoScrubberViewUnknownTag = -1;
   }
 
   // Lay out the visible photos.
-  for (NSInteger ix = 0; ix < _numberOfVisiblePhotos; ++ix) {
+  for (NSUInteger ix = 0; ix < (NSUInteger)_numberOfVisiblePhotos; ++ix) {
     UIImageView* photoView = nil;
 
     // We must first get the photo view at this index.
 
     // If there aren't enough visible photo views then try to recycle another view.
     if (ix >= [_visiblePhotoViews count]) {
-      photoView = [[[_recycledPhotoViews anyObject] retain] autorelease];
+      photoView = [_recycledPhotoViews anyObject];
       if (nil == photoView) {
         // Couldn't recycle the view, so create a new one.
         photoView = [self photoView];
@@ -452,9 +461,6 @@ static const NSInteger NIPhotoScrubberViewUnknownTag = -1;
   for (UIView* photoView in _visiblePhotoViews) {
     [photoView removeFromSuperview];
   }
-
-  NI_RELEASE_SAFELY(_visiblePhotoViews);
-  NI_RELEASE_SAFELY(_recycledPhotoViews);
 
   // If there is no data source then we can't do anything particularly interesting.
   if (nil == _dataSource) {

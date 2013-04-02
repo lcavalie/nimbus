@@ -18,11 +18,14 @@
 
 #import "NSString+NimbusCore.h"
 
-#import "NSData+NimbusCore.h"
+#import "NIFoundationMethods.h"
 #import "NIPreprocessorMacros.h"
 
 #import <UIKit/UIKit.h>
 
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,33 +39,19 @@ NI_FIX_CATEGORY_BUG(NSStringNimbusCore)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /**
- * Determines if the string contains only whitespace and newlines.
- */
-- (BOOL)isWhitespaceAndNewlines {
-  NSCharacterSet* whitespace = [NSCharacterSet whitespaceAndNewlineCharacterSet];
-  for (NSInteger i = 0; i < self.length; ++i) {
-    unichar c = [self characterAtIndex:i];
-    if (![whitespace characterIsMember:c]) {
-      return NO;
-    }
-  }
-  return YES;
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-/**
  * Calculates the height of this text given the font, max width, and line break mode.
  *
  * A convenience wrapper for sizeWithFont:constrainedToSize:lineBreakMode:
  */
-- (CGFloat)heightWithFont: (UIFont*)font
-       constrainedToWidth: (CGFloat)width
-            lineBreakMode: (UILineBreakMode)lineBreakMode {
-  return [self sizeWithFont: font
-          constrainedToSize: CGSizeMake(width, CGFLOAT_MAX)
-              lineBreakMode: lineBreakMode].height;
+// COV_NF_START
+- (CGFloat)heightWithFont:(UIFont*)font
+       constrainedToWidth:(CGFloat)width
+            lineBreakMode:(UILineBreakMode)lineBreakMode {
+  return [self sizeWithFont:font
+          constrainedToSize:CGSizeMake(width, CGFLOAT_MAX)
+              lineBreakMode:lineBreakMode].height;
 }
+// COV_NF_END
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,7 +68,7 @@ NI_FIX_CATEGORY_BUG(NSStringNimbusCore)
 - (NSDictionary*)queryContentsUsingEncoding:(NSStringEncoding)encoding {
   NSCharacterSet* delimiterSet = [NSCharacterSet characterSetWithCharactersInString:@"&;"];
   NSMutableDictionary* pairs = [NSMutableDictionary dictionary];
-  NSScanner* scanner = [[[NSScanner alloc] initWithString:self] autorelease];
+  NSScanner* scanner = [[NSScanner alloc] initWithString:self];
   while (![scanner isAtEnd]) {
     NSString* pairString = nil;
     [scanner scanUpToCharactersFromSet:delimiterSet intoString:&pairString];
@@ -112,12 +101,19 @@ NI_FIX_CATEGORY_BUG(NSStringNimbusCore)
  * Returns a string that has been escaped for use as a URL parameter.
  */
 - (NSString *)stringByAddingPercentEscapesForURLParameter {
-  return [(NSString *)CFURLCreateStringByAddingPercentEscapes(kCFAllocatorDefault,
-                                                              (CFStringRef)self,
-                                                              NULL,
-                                                              (CFStringRef)@";/?:@&=+$,",
-                                                              kCFStringEncodingUTF8)
-          autorelease];
+  
+  CFStringRef buffer = 
+  CFURLCreateStringByAddingPercentEscapes(kCFAllocatorDefault,
+                                          (__bridge CFStringRef)self,
+                                          NULL,
+                                          (__bridge CFStringRef)@";/?:@&=+$,",
+                                          kCFStringEncodingUTF8);
+  
+  NSString *result = [NSString stringWithString:(__bridge NSString *)buffer];
+  
+  CFRelease(buffer);
+  
+  return result;
 }
 
 
@@ -222,7 +218,7 @@ NI_FIX_CATEGORY_BUG(NSStringNimbusCore)
  * @returns md5 hash of this string.
  */
 - (NSString*)md5Hash {
-  return [[self dataUsingEncoding:NSUTF8StringEncoding] md5Hash];
+  return NIMD5HashFromData([self dataUsingEncoding:NSUTF8StringEncoding]);
 }
 
 
@@ -233,7 +229,7 @@ NI_FIX_CATEGORY_BUG(NSStringNimbusCore)
  * @returns SHA1 hash of this string.
  */
 - (NSString*)sha1Hash {
-  return [[self dataUsingEncoding:NSUTF8StringEncoding] sha1Hash];
+  return NISHA1HashFromData([self dataUsingEncoding:NSUTF8StringEncoding]);
 }
 
 @end

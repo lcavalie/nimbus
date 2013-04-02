@@ -17,13 +17,15 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
+#import "NIPreprocessorMacros.h" /* for NI_WEAK */
+
 @protocol NIPhotoScrubberViewDataSource;
 @protocol NIPhotoScrubberViewDelegate;
 
 /**
  * A control built for quickly skimming through a collection of images.
  *
- *      @ingroup Photos-Views
+ *      @ingroup NimbusPhotos
  *
  * The user interacts with the scrubber by "scrubbing" their finger along the control,
  * or more simply, touching the control and moving their finger along a single axis.
@@ -59,10 +61,9 @@
   NSInteger _numberOfPhotos;
 
   // Cached display values
-  CGFloat _numberOfVisiblePhotos;
+  NSInteger _numberOfVisiblePhotos;
   
-  id<NIPhotoScrubberViewDataSource> _dataSource;
-  id<NIPhotoScrubberViewDelegate> _delegate;
+  __unsafe_unretained id<NIPhotoScrubberViewDelegate> _delegate;
 }
 
 #pragma mark Data Source /** @name Data Source */
@@ -70,7 +71,7 @@
 /**
  * The data source for this scrubber view.
  */
-@property (nonatomic, readwrite, assign) id<NIPhotoScrubberViewDataSource> dataSource;
+@property (nonatomic, readwrite, NI_WEAK) id<NIPhotoScrubberViewDataSource> dataSource;
 
 /**
  * Forces the scrubber view to reload all of its data.
@@ -118,7 +119,7 @@
 /**
  * The data source for the photo scrubber.
  *
- *      @ingroup Photos-Protocols
+ *      @ingroup NimbusPhotos
  *
  * <h2>Performance Considerations</h2>
  *
@@ -165,7 +166,7 @@
 /**
  * The delegate for the photo scrubber.
  *
- *      @ingroup Photos-Protocols
+ *      @ingroup NimbusPhotos
  *
  * Sends notifications of state changes.
  *

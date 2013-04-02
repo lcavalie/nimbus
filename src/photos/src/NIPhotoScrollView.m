@@ -20,6 +20,10 @@
 
 #import "NimbusCore.h"
 
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
+
 /**
  * A UIScrollView that centers the zooming view's frame as the user zooms.
  *
@@ -96,15 +100,9 @@
 @synthesize zoomingAboveOriginalSizeIsEnabled = _zoomingAboveOriginalSizeIsEnabled;
 @synthesize photoScrollViewDelegate = _photoScrollViewDelegate;
 @synthesize doubleTapToZoomIsEnabled = _doubleTapToZoomIsEnabled;
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)dealloc {
-  NI_RELEASE_SAFELY(_doubleTapGestureRecognizer);
-  NI_RELEASE_SAFELY(_reuseIdentifier);
-
-  [super dealloc];
-}
+@synthesize maximumScale = _maximumScale;
+@synthesize loading = _loading;
+@synthesize doubleTapGestureRecognizer = _doubleTapGestureRecognizer;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,9 +114,14 @@
     self.doubleTapToZoomIsEnabled = YES;
 
     // Autorelease so that we don't have to worry about releasing the subviews in dealloc.
-    _scrollView = [[[NICenteringScrollView alloc] initWithFrame:self.bounds] autorelease];
+    _scrollView = [[NICenteringScrollView alloc] initWithFrame:self.bounds];
     _scrollView.autoresizingMask = (UIViewAutoresizingFlexibleWidth
                                     | UIViewAutoresizingFlexibleHeight);
+
+    _loadingView = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhite];
+    [_loadingView sizeToFit];
+    _loadingView.frame = NIFrameOfCenteredViewWithinView(_loadingView, self);
+    _loadingView.autoresizingMask = UIViewAutoresizingFlexibleMargins;
 
     // We implement viewForZoomingInScrollView: and return the image view for zooming.
     _scrollView.delegate = self;
@@ -135,10 +138,11 @@
     self.backgroundColor = [UIColor blackColor];
     _scrollView.backgroundColor = self.backgroundColor;
 
-    _imageView = [[[UIImageView alloc] initWithFrame:CGRectZero] autorelease];
+    _imageView = [[UIImageView alloc] initWithFrame:CGRectZero];
 
     [_scrollView addSubview:_imageView];
     [self addSubview:_scrollView];
+    [self addSubview:_loadingView];
   }
   return self;
 }
@@ -292,6 +296,18 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)setLoading:(BOOL)loading {
+  _loading = loading;
+
+  if (loading) {
+    [_loadingView startAnimating];
+  } else {
+    [_loadingView stopAnimating];
+  }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 - (UIImage *)image {
   return _imageView.image;
 }
@@ -427,7 +443,6 @@
   CGSize imageSize = _imageView.bounds.size;
   
   // Avoid crashing if the image has no dimensions.
-  NIDASSERT(imageSize.width > 0 && imageSize.height > 0);
   if (imageSize.width <= 0 || imageSize.height <= 0) {
     _scrollView.maximumZoomScale = 1;
     _scrollView.minimumZoomScale = 1;
@@ -474,7 +489,11 @@
   }
   
   // If zooming is disabled then we flatten the range for zooming to only allow the min zoom.
-  _scrollView.maximumZoomScale = [self isZoomingEnabled] ? maxScale : minScale;
+  if (self.isZoomingEnabled && NIPhotoScrollViewPhotoSizeOriginal == self.photoSize && self.maximumScale > 0) {
+    _scrollView.maximumZoomScale = self.maximumScale;
+  } else {
+    _scrollView.maximumZoomScale = self.isZoomingEnabled ? maxScale : minScale;
+  }
   _scrollView.minimumZoomScale = minScale;
 }
 

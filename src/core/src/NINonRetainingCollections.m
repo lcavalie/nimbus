@@ -18,34 +18,24 @@
 
 #import "NINonRetainingCollections.h"
 
-// No-ops for non-retaining objects.
-static const void* NIRetainNoOp(CFAllocatorRef allocator, const void *value) { return value; }
-static void NIReleaseNoOp(CFAllocatorRef allocator, const void *value) { }
-
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 NSMutableArray* NICreateNonRetainingMutableArray(void) {
-  CFArrayCallBacks callbacks = kCFTypeArrayCallBacks;
-  callbacks.retain = NIRetainNoOp;
-  callbacks.release = NIReleaseNoOp;
-  return (NSMutableArray *)CFArrayCreateMutable(nil, 0, &callbacks);
+  return (__bridge_transfer NSMutableArray *)CFArrayCreateMutable(nil, 0, nil);
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 NSMutableDictionary* NICreateNonRetainingMutableDictionary(void) {
-  CFDictionaryKeyCallBacks keyCallbacks = kCFTypeDictionaryKeyCallBacks;
-  CFDictionaryValueCallBacks callbacks = kCFTypeDictionaryValueCallBacks;
-  callbacks.retain = NIRetainNoOp;
-  callbacks.release = NIReleaseNoOp;
-  return (NSMutableDictionary *)CFDictionaryCreateMutable(nil, 0, &keyCallbacks, &callbacks);
+  return (__bridge_transfer NSMutableDictionary *)CFDictionaryCreateMutable(nil, 0, nil, nil);
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 NSMutableSet* NICreateNonRetainingMutableSet(void) {
-  CFSetCallBacks callbacks = kCFTypeSetCallBacks;
-  callbacks.retain = NIRetainNoOp;
-  callbacks.release = NIReleaseNoOp;
-  return (NSMutableSet *)CFSetCreateMutable(nil, 0, &callbacks);
+  return (__bridge_transfer NSMutableSet *)CFSetCreateMutable(nil, 0, nil);
 }
+

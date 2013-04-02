@@ -22,10 +22,14 @@
 @class NIStylesheet;
 @class NIStylesheetCache;
 
+extern NSString* const NIJSONDidChangeNotification;
+extern NSString* const NIJSONDidChangeFilePathKey;
+extern NSString* const NIJSONDidChangeNameKey;
+
 /**
  * An observer for the Chameleon server.
  *
- *      @ingroup CSS-Stylesheets
+ *      @ingroup NimbusCSS
  *
  * This observer connects to a Chameleon server and waits for changes in stylesheets. Once
  * a stylesheet change has been detected, the new stylesheet is retrieved from the server
@@ -40,7 +44,7 @@
 @private
   NIStylesheetCache* _stylesheetCache;
   NSMutableArray* _stylesheetPaths;
-  NSOperationQueue* _operations;
+  NSOperationQueue* _queue;
   NSString* _host;
   NSInteger _retryCount;
 }
@@ -51,6 +55,8 @@
 - (NIStylesheet *)stylesheetForPath:(NSString *)path;
 
 - (void)watchSkinChanges;
+
+- (void)enableBonjourDiscovery: (NSString*) serviceName;
 
 @end
 
@@ -73,4 +79,11 @@
  * and then fires the appropriate notifications.
  *
  *      @fn NIChameleonObserver::watchSkinChanges
+ */
+
+/**
+ * Browses Bonjour for services with the given name (e.g. your username) and sets the host
+ * automatically.
+ *
+ *      @fn NIChameleonObserver::enableBonjourDiscovery:
  */

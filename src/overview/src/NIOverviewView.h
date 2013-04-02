@@ -16,7 +16,7 @@
 
 #import <UIKit/UIKit.h>
 
-#ifdef DEBUG
+#if defined(DEBUG) || defined(NI_DEBUG)
 
 @class NIOverviewPageView;
 
@@ -43,9 +43,19 @@
 @property (nonatomic, readwrite, assign) BOOL translucent;
 
 /**
+ * Prepends a new page to the Overview.
+ */
+- (void)prependPageView:(NIOverviewPageView *)page;
+
+/**
  * Adds a new page to the Overview.
  */
 - (void)addPageView:(NIOverviewPageView *)page;
+
+/**
+ * Removes a page from the Overview.
+ */
+- (void)removePageView:(NIOverviewPageView *)page;
 
 /**
  * Update all of the views.

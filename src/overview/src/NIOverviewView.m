@@ -16,12 +16,17 @@
 
 #import "NIOverviewView.h"
 
-#ifdef DEBUG
+#if defined(DEBUG) || defined(NI_DEBUG)
 
 #import "NimbusCore.h"
 
+#import "NIOverviewLogger.h"
 #import "NIDeviceInfo.h"
 #import "NIOverviewPageView.h"
+
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
 
 @interface NIOverviewView()
 
@@ -39,26 +44,15 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)dealloc {
-  NI_RELEASE_SAFELY(_backgroundImage);
-  NI_RELEASE_SAFELY(_pageViews);
-
-  [super dealloc];
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
 - (id)initWithFrame:(CGRect)frame {
   if ((self = [super initWithFrame:frame])) {
     _pageViews = [[NSMutableArray alloc] init];
 
-    _backgroundImage = [[UIImage imageWithContentsOfFile:
-                         NIPathForBundleResource(nil, @"NimbusOverviewer.bundle/gfx/blueprint.gif")]
-                        retain];
+    _backgroundImage = [UIImage imageWithContentsOfFile:
+                        NIPathForBundleResource(nil, @"NimbusOverviewer.bundle/gfx/blueprint.gif")];
     self.backgroundColor = [UIColor colorWithPatternImage:_backgroundImage];
 
-    _pagingScrollView = [[[UIScrollView alloc] initWithFrame:[self frameForPagingScrollView]]
-                         autorelease];
+    _pagingScrollView = [[UIScrollView alloc] initWithFrame:[self frameForPagingScrollView]];
     _pagingScrollView.pagingEnabled = YES;
     _pagingScrollView.scrollIndicatorInsets = UIEdgeInsetsMake(0, self.pageHorizontalMargin,
                                                                0, self.pageHorizontalMargin);
@@ -67,10 +61,22 @@
                                           | UIViewAutoresizingFlexibleHeight);
 
     [self addSubview:_pagingScrollView];
+    
+    self.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(updatePages)
+                                                 name:NIOverviewLoggerDidAddDeviceLog
+                                               object:nil];
   }
   return self;
 }
 
+- (void)dealloc {
+  [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                  name:NIOverviewLoggerDidAddDeviceLog
+                                                object:nil];
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -127,7 +133,7 @@
 - (void)layoutPages {
   _pagingScrollView.contentSize = [self contentSizeForPagingScrollView];
 
-  for (NSInteger ix = 0; ix < [_pageViews count]; ++ix) {
+  for (NSUInteger ix = 0; ix < [_pageViews count]; ++ix) {
     UIView* pageView = [_pageViews objectAtIndex:ix];
     pageView.frame = [self frameForPageAtIndex:ix];
   }
@@ -139,7 +145,7 @@
   CGFloat offset = _pagingScrollView.contentOffset.x;
   CGFloat pageWidth = _pagingScrollView.bounds.size.width;
 
-  return floorf(offset / pageWidth);
+  return (NSInteger)(offset / pageWidth);
 }
 
 
@@ -151,6 +157,20 @@
 
   [self layoutPages];
 
+  CGFloat pageWidth = _pagingScrollView.bounds.size.width;
+  CGFloat newOffset = (visiblePageIndex * pageWidth);
+  _pagingScrollView.contentOffset = CGPointMake(newOffset, 0);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)setFrame:(CGRect)frame {
+  NSInteger visiblePageIndex = [self visiblePageIndex];
+  
+  [super setFrame:frame];
+  
+  [self layoutPages];
+  
   CGFloat pageWidth = _pagingScrollView.bounds.size.width;
   CGFloat newOffset = (visiblePageIndex * pageWidth);
   _pagingScrollView.contentOffset = CGPointMake(newOffset, 0);
@@ -180,9 +200,27 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)prependPageView:(NIOverviewPageView *)page {
+  [_pageViews insertObject:page atIndex:0];
+  [_pagingScrollView addSubview:page];
+
+  [self layoutPages];
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)addPageView:(NIOverviewPageView *)page {
   [_pageViews addObject:page];
   [_pagingScrollView addSubview:page];
+
+  [self layoutPages];
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)removePageView:(NIOverviewPageView *)page {
+  [_pageViews removeObject:page];
+  [page removeFromSuperview];
 
   [self layoutPages];
 }

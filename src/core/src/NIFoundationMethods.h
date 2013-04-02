@@ -19,6 +19,10 @@
 
 #import "NIPreprocessorMacros.h"
 
+#if defined __cplusplus
+extern "C" {
+#endif
+
 /**
  * For filling in gaps in Apple's Foundation framework.
  *
@@ -54,6 +58,15 @@
 CGRect NIRectContract(CGRect rect, CGFloat dx, CGFloat dy);
 
 /**
+ * Modifies only the right and bottom edges of a CGRect.
+ *
+ *      @return a CGRect with dx and dy added to the width and height.
+ *
+ *      Example result: CGRectMake(x, y, w + dx, h + dy)
+ */
+CGRect NIRectExpand(CGRect rect, CGFloat dx, CGFloat dy);
+
+/**
  * Modifies only the top and left edges of a CGRect.
  *
  *      @return a CGRect whose origin has been offset by dx, dy, and whose size has been
@@ -64,15 +77,38 @@ CGRect NIRectContract(CGRect rect, CGFloat dx, CGFloat dy);
 CGRect NIRectShift(CGRect rect, CGFloat dx, CGFloat dy);
 
 /**
- * Add the insets to a CGRect - equivalent to padding in CSS.
+ * Inverse of UIEdgeInsetsInsetRect.
  *
- *      @attention This method is deprecated. Please use UIEdgeInsetsInsetRect instead.
- *
- *      @return a CGRect whose edges have been inset.
- *
- *      Example result: CGRectMake(x + left, y + top, w - (left + right), h - (top + bottom))
+ *      Example result: CGRectMake(x - left, y - top,
+ *                                 w + left + right, h + top + bottom)
  */
-CGRect NIRectInset(CGRect rect, UIEdgeInsets insets) __NI_DEPRECATED_METHOD;
+CGRect NIEdgeInsetsOutsetRect(CGRect rect, UIEdgeInsets outsets);
+
+/**
+ * Returns the x position that will center size within containerSize.
+ *
+ *      Example result: floorf((containerSize.width - size.width) / 2.f)
+ */
+CGFloat NICenterX(CGSize containerSize, CGSize size);
+
+/**
+ * Returns the y position that will center size within containerSize.
+ *
+ *      Example result: floorf((containerSize.height - size.height) / 2.f)
+ */
+CGFloat NICenterY(CGSize containerSize, CGSize size);
+
+/**
+ * Returns a rect that will center viewToCenter within containerView.
+ *
+ *      @return a CGPoint that will center viewToCenter within containerView.
+ */
+CGRect NIFrameOfCenteredViewWithinView(UIView* viewToCenter, UIView* containerView);
+
+/**
+ * Returns the size of the string with given UILabel properties.
+ */
+CGSize NISizeOfStringWithLabelProperties(NSString *string, CGSize constrainedToSize, UIFont *font, UILineBreakMode lineBreakMode, NSInteger numberOfLines);
 
 /**@}*/
 
@@ -99,6 +135,48 @@ CGRect NIRectInset(CGRect rect, UIEdgeInsets insets) __NI_DEPRECATED_METHOD;
  *                 the sign of the values so you should take care to fix this.
  */
 NSRange NIMakeNSRangeFromCFRange(CFRange range);
+
+/**@}*/
+
+
+#pragma mark -
+#pragma mark NSData Methods
+
+/**
+ * For manipulating NSData.
+ *
+ * @defgroup NSData-Methods NSData Methods
+ * @{
+ */
+
+/**
+ * Calculates an md5 hash of the data using CC_MD5.
+ */
+NSString* NIMD5HashFromData(NSData* data);
+
+/**
+ * Calculates a sha1 hash of the data using CC_SHA1.
+ */
+NSString* NISHA1HashFromData(NSData* data);
+
+/**@}*/
+
+
+#pragma mark -
+#pragma mark NSString Methods
+
+/**
+ * For manipulating NSStrings.
+ *
+ * @defgroup NSString-Methods NSString Methods
+ * @{
+ */
+
+/**
+ * Returns a Boolean value indicating whether the string is a NSString object that contains only
+ * whitespace and newlines.
+ */
+BOOL NIIsStringWithWhitespaceAndNewlines(NSString* string);
 
 /**@}*/
 
@@ -133,6 +211,9 @@ NSInteger boundi(NSInteger value, NSInteger min, NSInteger max);
 
 /**@}*/
 
+#if defined __cplusplus
+};
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /**@}*/// End of Foundation Methods ///////////////////////////////////////////////////////////////

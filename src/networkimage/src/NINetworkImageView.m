@@ -1,5 +1,5 @@
 //
-// Copyright 2011 Jeff Verkoeyen
+// Copyright 2011-2012 Jeff Verkoeyen
 //
 // Forked from Three20 June 15, 2011 - Copyright 2009-2011 Facebook
 //
@@ -19,20 +19,18 @@
 #import "NINetworkImageView.h"
 
 #import "NimbusCore.h"
+#import "AFNetworking.h"
+#import "NIImageProcessing.h"
 
-#import "NINetworkImageRequest.h"
-
-
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 @interface NINetworkImageView()
-
-@property (nonatomic, readwrite, retain) NSOperation* operation;
-
-@property (nonatomic, readwrite, copy) NSString* lastPathToNetworkImage;
-
+@property (nonatomic, readwrite, NI_STRONG) NSOperation* operation;
 @end
 
 
@@ -49,8 +47,6 @@
 @synthesize networkOperationQueue   = _networkOperationQueue;
 @synthesize maxAge                  = _maxAge;
 @synthesize initialImage            = _initialImage;
-@synthesize memoryCachePrefix       = _memoryCachePrefix;
-@synthesize lastPathToNetworkImage  = _lastPathToNetworkImage;
 @synthesize delegate                = _delegate;
 
 
@@ -69,19 +65,6 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)dealloc {
   [self cancelOperation];
-
-  NI_RELEASE_SAFELY(_operation);
-
-  NI_RELEASE_SAFELY(_initialImage);
-
-  NI_RELEASE_SAFELY(_imageMemoryCache);
-  NI_RELEASE_SAFELY(_networkOperationQueue);
-
-  NI_RELEASE_SAFELY(_memoryCachePrefix);
-
-  NI_RELEASE_SAFELY(_lastPathToNetworkImage);
-
-  [super dealloc];
 }
 
 
@@ -144,11 +127,6 @@
 
   NSString* cacheKey = cacheIdentifier;
 
-  // Prefix cache key to create a namespace.
-  if (nil != self.memoryCachePrefix) {
-    cacheKey = [self.memoryCachePrefix stringByAppendingString:cacheKey];
-  }
-
   // Append the size to the key. This allows us to differentiate cache keys by image dimension.
   // If the display size ever changes, we want to ensure that we're fetching the correct image
   // from the cache.
@@ -158,7 +136,7 @@
   }
 
   // The resulting cache key will look like:
-  // (memoryCachePrefix)/path/to/image({width,height}{contentMode,cropImageForDisplay})
+  // /path/to/image({width,height}{contentMode,cropImageForDisplay})
 
   return cacheKey;
 }
@@ -188,7 +166,7 @@
                       scaleOptions: (NINetworkImageViewScaleOptions)scaleOptions
                     expirationDate: (NSDate *)expirationDate {
   // Store the result image in the memory cache.
-  if (nil != self.imageMemoryCache) {
+  if (nil != self.imageMemoryCache && nil != image) {
     NSString* cacheKey = [self cacheKeyForCacheIdentifier:cacheIdentifier
                                                 imageSize:displaySize
                                               contentMode:contentMode
@@ -200,8 +178,13 @@
                           expiresAfter: expirationDate];
   }
 
-  // Display the new image.
-  [self setImage:image];
+  if (nil != image) {
+    // Display the new image.
+    [self setImage:image];
+
+  } else {
+    [self setImage:self.initialImage];
+  }
 
   self.operation = nil;
 
@@ -217,7 +200,11 @@
 - (void)_didFailToLoadWithError:(NSError *)error {
   self.operation = nil;
 
-  [self networkImageViewDidFailToLoad:error];
+  if ([self.delegate respondsToSelector:@selector(networkImageView:didFailWithError:)]) {
+    [self.delegate networkImageView:self didFailWithError:error];
+  }
+
+  [self networkImageViewDidFailWithError:error];
 }
 
 
@@ -228,13 +215,13 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)operationDidStart:(NSOperation *)operation {
+- (void)nimbusOperationDidStart:(NIOperation *)operation {
   [self _didStartLoading];
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)operationDidFinish:(NINetworkImageRequest *)operation {
+- (void)nimbusOperationDidFinish:(NIOperation<NINetworkImageOperation> *)operation {
   [self _didFinishLoadingWithImage:operation.imageCroppedAndSizedForDisplay
                    cacheIdentifier:operation.cacheIdentifier
                        displaySize:operation.imageDisplaySize
@@ -245,7 +232,7 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)operationDidFail:(NSOperation *)operation withError:(NSError *)error {
+- (void)nimbusOperationDidFail:(NIOperation *)operation withError:(NSError *)error {
   [self _didFailToLoadWithError:error];
 }
 
@@ -269,7 +256,7 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)networkImageViewDidFailToLoad:(NSError *)error {
+- (void)networkImageViewDidFailWithError:(NSError *)error {
   // No-op. Meant to be overridden.
 }
 
@@ -330,8 +317,6 @@
   [self cancelOperation];
 
   if (NIIsStringWithAnyText(pathToNetworkImage)) {
-    self.lastPathToNetworkImage = pathToNetworkImage;
-
     NSURL* url = nil;
 
     // Check for file URLs.
@@ -348,9 +333,83 @@
     if (nil == url) {
       return;
     }
+    // We explicitly do not allow negative display sizes. Check the call stack to figure
+    // out who is providing a negative display size. It's possible that displaySize is an
+    // uninitialized CGSize structure.
+    NIDASSERT(displaySize.width >= 0);
+    NIDASSERT(displaySize.height >= 0);
     
-    NINetworkImageRequest* request = [[[NINetworkImageRequest alloc] initWithURL:url] autorelease];
-    [self setNetworkImageOperation:request forDisplaySize:displaySize contentMode:contentMode cropRect:cropRect];
+    // If an invalid display size IS provided, use the image view's frame instead.
+    if (0 >= displaySize.width || 0 >= displaySize.height) {
+      displaySize = self.frame.size;
+    }
+    
+    UIImage* image = nil;
+    
+    // Attempt to load the image from memory first.
+    NSString* cacheKey = nil;
+    if (nil != self.imageMemoryCache) {
+      cacheKey = [self cacheKeyForCacheIdentifier:pathToNetworkImage
+                                        imageSize:displaySize
+                                      contentMode:contentMode
+                                     scaleOptions:self.scaleOptions];
+      image = [self.imageMemoryCache objectWithName:cacheKey];
+    }
+
+    if (nil != image) {
+      // We successfully loaded the image from memory.
+      [self setImage:image];
+      
+      if ([self.delegate respondsToSelector:@selector(networkImageView:didLoadImage:)]) {
+        [self.delegate networkImageView:self didLoadImage:self.image];
+      }
+      
+      [self networkImageViewDidLoadImage:image];
+
+    } else {
+      if (!self.sizeForDisplay) {
+        displaySize = CGSizeZero;
+        contentMode = UIViewContentModeScaleToFill;
+      }
+
+      NSURLRequest *request = [NSURLRequest requestWithURL:url];
+      AFImageRequestOperation *operation =
+      [AFImageRequestOperation imageRequestOperationWithRequest:request imageProcessingBlock:
+       ^UIImage *(UIImage *downloadedImage) {
+         return [NIImageProcessing imageFromSource:downloadedImage
+                                   withContentMode:contentMode
+                                          cropRect:cropRect
+                                       displaySize:displaySize
+                                      scaleOptions:self.scaleOptions
+                              interpolationQuality:self.interpolationQuality];
+
+       } success:^(NSURLRequest *successfulRequest, NSHTTPURLResponse *response, UIImage *processedImage) {
+         [self _didFinishLoadingWithImage:processedImage
+                          cacheIdentifier:pathToNetworkImage
+                              displaySize:displaySize
+                              contentMode:contentMode
+                             scaleOptions:self.scaleOptions
+                           expirationDate:nil];
+
+       } failure:^(NSURLRequest *errorRequest, NSHTTPURLResponse *response, NSError *error) {
+         [self _didFailToLoadWithError:error];
+       }];
+        
+      [operation setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead) {
+          if ([self.delegate respondsToSelector:@selector(networkImageView:readBytes:totalBytes:)]) {
+              [self.delegate networkImageView:self readBytes:totalBytesRead totalBytes:totalBytesExpectedToRead];
+          }
+      }];
+
+      // We handle image scaling ourselves in the image processing method, so we need to disable
+      // AFNetworking from doing so as well.
+      operation.imageScale = 1;
+
+      self.operation = operation;
+
+      [self _didStartLoading];
+      [self.networkOperationQueue addOperation:operation];
+    }
   }
 }
 
@@ -366,7 +425,7 @@
     NIDASSERT(displaySize.width >= 0);
     NIDASSERT(displaySize.height >= 0);
 
-    // If an invalid display size is provided, use the image view's frame instead.
+    // If an invalid display size IS provided, use the image view's frame instead.
     if (0 >= displaySize.width || 0 >= displaySize.height) {
       displaySize = self.frame.size;
     }
@@ -389,6 +448,8 @@
       if ([self.delegate respondsToSelector:@selector(networkImageView:didLoadImage:)]) {
         [self.delegate networkImageView:self didLoadImage:self.image];
       }
+
+      [self networkImageViewDidLoadImage:image];
 
     } else {
       // Unable to load the image from memory, so let's fire off the operation now.
@@ -427,11 +488,11 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)setInitialImage:(UIImage *)initialImage {
   if (_initialImage != initialImage) {
-    BOOL updateViewImage = (_initialImage == self.image);
-    [_initialImage release];
-    _initialImage = [initialImage retain];
+    // Only update the displayed image if we're currently showing the old initial image.
+    BOOL updateDisplayedImage = (_initialImage == self.image);
+    _initialImage = initialImage;
 
-    if (updateViewImage) {
+    if (updateDisplayedImage) {
       [self setImage:_initialImage];
     }
   }
@@ -440,7 +501,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (BOOL)isLoading {
-  return nil != self.operation;
+  return [self.operation isExecuting];
 }
 
 
@@ -451,10 +512,7 @@
   if (nil == queue) {
     queue = [Nimbus networkOperationQueue];
   }
-  if (queue != _networkOperationQueue) {
-    [_networkOperationQueue release];
-    _networkOperationQueue = [queue retain];
-  }
+  _networkOperationQueue = queue;
 }
 
 

@@ -91,9 +91,19 @@
 #define NIIOS_4_3     40300
 
 /**
- * Release TBD.
+ * Released on October 12, 2011.
  */
 #define NIIOS_5_0     50000
+
+/**
+ * Released on March 7, 2012.
+ */
+#define NIIOS_5_1     50100
+
+/**
+ * Release TBD. Should be sometime between September and October.
+ */
+#define NIIOS_6_0     60000
 
 #ifndef kCFCoreFoundationVersionNumber_iPhoneOS_2_0
 #define kCFCoreFoundationVersionNumber_iPhoneOS_2_0 478.23
@@ -123,6 +133,26 @@
 #define kCFCoreFoundationVersionNumber_iOS_4_0 550.32
 #endif
 
+#ifndef kCFCoreFoundationVersionNumber_iOS_4_1
+#define kCFCoreFoundationVersionNumber_iOS_4_1 550.38
+#endif
+
+#ifndef kCFCoreFoundationVersionNumber_iOS_4_2
+#define kCFCoreFoundationVersionNumber_iOS_4_2 550.52
+#endif
+
+#ifndef kCFCoreFoundationVersionNumber_iOS_4_3
+#define kCFCoreFoundationVersionNumber_iOS_4_3 550.52
+#endif
+
+#ifndef kCFCoreFoundationVersionNumber_iOS_5_0
+#define kCFCoreFoundationVersionNumber_iOS_5_0 675
+#endif
+
+#ifndef kCFCoreFoundationVersionNumber_iOS_5_1
+#define kCFCoreFoundationVersionNumber_iOS_5_1 690.1
+#endif
+
 #if __cplusplus
 extern "C" {
 #endif
@@ -133,6 +163,14 @@ extern "C" {
  *      @returns YES if the device is an iPad.
  */
 BOOL NIIsPad(void);
+
+/**
+ * Checks whether the device the app is currently running on is an
+ * iPhone/iPod touch or not.
+ *
+ *      @returns YES if the device is an iPhone or iPod touch.
+ */
+BOOL NIIsPhone(void);
 
 /**
  * Checks whether the device's OS version is at least the given version number.
@@ -153,6 +191,11 @@ BOOL NIDeviceOSVersionIsAtLeast(double versionNumber);
  *     iOS 4.0: returns the device's screen scale.
  */
 CGFloat NIScreenScale(void);
+
+/**
+ * Returns YES if the screen is a retina display, NO otherwise.
+ */
+BOOL NIIsRetina(void);
 
 /**
  * Safely fetch the UIPopoverController class if it is available.
@@ -203,7 +246,7 @@ Class NIUITapGestureRecognizerClass(void);
 // Define methods that were introduced in iOS 4.0.
 #if __IPHONE_OS_VERSION_MAX_ALLOWED < NIIOS_4_0
 
-@interface UIImage (NimbusSDKAvailability)
+@interface UIImage (Nimbus4SDKAvailability)
 
 + (UIImage *)imageWithCGImage:(CGImageRef)imageRef scale:(CGFloat)scale orientation:(UIImageOrientation)orientation;
 
@@ -211,9 +254,23 @@ Class NIUITapGestureRecognizerClass(void);
 
 @end
 
-@interface UIScreen (NimbusSDKAvailability)
+@interface UIScreen (Nimbus4SDKAvailability)
 
 - (CGFloat)scale;
+
+@end
+
+#endif
+
+
+// Define methods that were introduced in iOS 6.0.
+#if __IPHONE_OS_VERSION_MAX_ALLOWED < NIIOS_6_0
+
+@interface UIImage (Nimbus6SDKAvailability)
+
+typedef NSInteger UIImageResizingMode;
+extern const UIImageResizingMode UIImageResizingModeStretch;
+- (UIImage *)resizableImageWithCapInsets:(UIEdgeInsets)capInsets resizingMode:(UIImageResizingMode)resizingMode;
 
 @end
 

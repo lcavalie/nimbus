@@ -28,18 +28,6 @@
 
 @synthesize window = _window;
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)dealloc {
-  [_window release];
-  _window = nil;
-
-  NI_RELEASE_SAFELY(_rootViewController);
-
-  [super dealloc];
-}
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma mark -
@@ -52,18 +40,17 @@
 
   [NIOverview applicationDidFinishLaunching];
 
-  self.window = [[[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds] autorelease];
+  self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
 
   CatalogTableViewController* catalogVC =
-  [[[CatalogTableViewController alloc] initWithStyle:UITableViewStyleGrouped] autorelease];
+    [[CatalogTableViewController alloc] initWithStyle:UITableViewStyleGrouped];
 
   _rootViewController = [[UINavigationController alloc] initWithRootViewController:catalogVC];
-
-  [self.window addSubview:_rootViewController.view];
-
-  [NIOverview addOverviewToWindow:self.window];
+  self.window.rootViewController = _rootViewController;
 
   [self.window makeKeyAndVisible];
+
+  [NIOverview addOverviewToWindow:self.window];
   
   return YES;
 }

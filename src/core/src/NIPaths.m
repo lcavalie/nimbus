@@ -18,6 +18,9 @@
 
 #import "NIPaths.h"
 
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 NSString* NIPathForBundleResource(NSBundle* bundle, NSString* relativePath) {
@@ -33,7 +36,33 @@ NSString* NIPathForDocumentsResource(NSString* relativePath) {
     NSArray* dirs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
                                                         NSUserDomainMask,
                                                         YES);
-    documentsPath = [[dirs objectAtIndex:0] retain];
+    documentsPath = [dirs objectAtIndex:0];
   }
   return [documentsPath stringByAppendingPathComponent:relativePath];
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+NSString* NIPathForLibraryResource(NSString* relativePath) {
+    static NSString* libraryPath = nil;
+    if (nil == libraryPath) {
+        NSArray* dirs = NSSearchPathForDirectoriesInDomains(NSLibraryDirectory,
+                                                            NSUserDomainMask,
+                                                            YES);
+        libraryPath = [dirs objectAtIndex:0];
+    }
+    return [libraryPath stringByAppendingPathComponent:relativePath];
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+NSString* NIPathForCachesResource(NSString* relativePath) {
+  static NSString* cachesPath = nil;
+  if (nil == cachesPath) {
+    NSArray* dirs = NSSearchPathForDirectoriesInDomains(NSCachesDirectory,
+                                                        NSUserDomainMask,
+                                                        YES);
+    cachesPath = [dirs objectAtIndex:0];
+  }
+  return [cachesPath stringByAppendingPathComponent:relativePath];
 }

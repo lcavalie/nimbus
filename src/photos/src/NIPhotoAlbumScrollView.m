@@ -20,6 +20,9 @@
 #import "NIPhotoAlbumScrollViewDataSource.h"
 #import "NimbusCore.h"
 
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,15 +33,6 @@
 @synthesize photoViewBackgroundColor = _photoViewBackgroundColor;
 @synthesize zoomingIsEnabled = _zoomingIsEnabled;
 @synthesize zoomingAboveOriginalSizeIsEnabled = _zoomingAboveOriginalSizeIsEnabled;
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)dealloc {
-  NI_RELEASE_SAFELY(_loadingImage);
-  NI_RELEASE_SAFELY(_photoViewBackgroundColor);
-
-  [super dealloc];
-}
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,20 +93,25 @@
                                  originalPhotoDimensions: &originalPhotoDimensions];
 
   page.photoDimensions = originalPhotoDimensions;
+  page.loading = isLoading;
 
   if (nil == image) {
     page.zoomingIsEnabled = NO;
     [page setImage:self.loadingImage photoSize:NIPhotoScrollViewPhotoSizeUnknown];
 
   } else {
+    BOOL updateImage = photoSize > page.photoSize;
+    if (updateImage) {
+      [page setImage:image photoSize:photoSize];
+    }
+
+    // Configure this after the image is set otherwise if the page's image isn't there
+	// e.g. (after prepareForReuse), zooming will always be disabled
     page.zoomingIsEnabled = ([self isZoomingEnabled]
                              && (NIPhotoScrollViewPhotoSizeOriginal == photoSize));
-    if (photoSize > page.photoSize) {
-      [page setImage:image photoSize:photoSize];
 
-      if (NIPhotoScrollViewPhotoSizeOriginal == photoSize) {
-        [self notifyDelegatePhotoDidLoadAtIndex:page.pageIndex];
-      }
+    if (updateImage && NIPhotoScrollViewPhotoSizeOriginal == photoSize) {
+      [self notifyDelegatePhotoDidLoadAtIndex:page.pageIndex];
     }
   }
 }
@@ -158,7 +157,7 @@
   NSString* reuseIdentifier = @"photo";
   pageView = [pagingScrollView dequeueReusablePageWithIdentifier:reuseIdentifier];
   if (nil == pageView) {
-    pageView = [[[NIPhotoScrollView alloc] init] autorelease];
+    pageView = [[NIPhotoScrollView alloc] init];
     pageView.reuseIdentifier = reuseIdentifier;
     pageView.backgroundColor = self.photoViewBackgroundColor;
   }
@@ -180,6 +179,7 @@
 
       // Only replace the photo if it's of a higher quality than one we're already showing.
       if (photoSize > page.photoSize) {
+        page.loading = NO;
         [page setImage:image photoSize:photoSize];
 
         page.zoomingIsEnabled = ([self isZoomingEnabled]
@@ -209,8 +209,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)setPhotoViewBackgroundColor:(UIColor *)photoViewBackgroundColor {
   if (_photoViewBackgroundColor != photoViewBackgroundColor) {
-    [_photoViewBackgroundColor release];
-    _photoViewBackgroundColor = [photoViewBackgroundColor retain];
+      _photoViewBackgroundColor = photoViewBackgroundColor;
     
     for (UIView<NIPagingScrollViewPage>* page in self.visiblePages) {
       page.backgroundColor = photoViewBackgroundColor;
@@ -246,8 +245,10 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (id<NIPhotoAlbumScrollViewDelegate>)delegate {
-  NIDASSERT([[super delegate] conformsToProtocol:@protocol(NIPhotoAlbumScrollViewDelegate)]);
-  return (id<NIPhotoAlbumScrollViewDelegate>)[super delegate];
+  id<NIPagingScrollViewDelegate> superDelegate = [super delegate];
+  NIDASSERT(nil == superDelegate
+            || [superDelegate conformsToProtocol:@protocol(NIPhotoAlbumScrollViewDelegate)]);
+  return (id<NIPhotoAlbumScrollViewDelegate>)superDelegate;
 }
 
 

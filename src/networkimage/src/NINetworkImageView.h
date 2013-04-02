@@ -1,5 +1,5 @@
 //
-// Copyright 2011 Jeff Verkoeyen
+// Copyright 2011-2012 Jeff Verkoeyen
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ typedef enum {
 @property (readwrite, assign) NINetworkImageViewScaleOptions scaleOptions;
 @property (readwrite, assign) CGInterpolationQuality interpolationQuality;
 @property (readwrite, assign) UIViewContentMode imageContentMode;
-@property (readwrite, retain) UIImage* imageCroppedAndSizedForDisplay;
+@property (readwrite, NI_STRONG) UIImage* imageCroppedAndSizedForDisplay;
 @end
 
 /**
@@ -65,29 +65,9 @@ typedef enum {
  * Intelligently crops and resizes images for optimal memory use and uses threads to avoid
  * processing images on the UI thread.
  *
- *      @ingroup Network-Image-User-Interface
+ *      @ingroup NimbusNetworkImage
  */
-@interface NINetworkImageView : UIImageView <NIOperationDelegate> {
-@private
-  // The active operation for the image
-  NIOperation<NINetworkImageOperation>* _operation;
-
-  // Configurable Presentation Properties
-  UIImage* _initialImage;
-  BOOL _sizeForDisplay;
-  NINetworkImageViewScaleOptions _scaleOptions;
-  CGInterpolationQuality _interpolationQuality;
-  
-  // Configurable Properties
-  NSString* _memoryCachePrefix;
-  NSString* _lastPathToNetworkImage;
-  NSTimeInterval _maxAge;
-  NIImageMemoryCache* _imageMemoryCache;
-  NSOperationQueue* _networkOperationQueue;
-
-  // Delegation
-  id<NINetworkImageViewDelegate> _delegate;
-}
+@interface NINetworkImageView : UIImageView <NIOperationDelegate>
 
 #pragma mark Creating a Network Image View
 
@@ -95,20 +75,17 @@ typedef enum {
 
 #pragma mark Configurable Presentation Properties
 
-@property (nonatomic, readwrite, retain) UIImage* initialImage;     // Default: nil
+@property (nonatomic, readwrite, NI_STRONG) UIImage* initialImage;     // Default: nil
 @property (nonatomic, readwrite, assign) BOOL sizeForDisplay;       // Default: YES
 @property (nonatomic, readwrite, assign) NINetworkImageViewScaleOptions scaleOptions; // Default: NINetworkImageViewScaleToFitLeavesExcessAndScaleToFillCropsExcess
 @property (nonatomic, readwrite, assign) CGInterpolationQuality interpolationQuality; // Default: kCGInterpolationDefault
 
 #pragma mark Configurable Properties
 
-@property (nonatomic, readwrite, retain) NIImageMemoryCache* imageMemoryCache;    // Default: [Nimbus imageMemoryCache]
-@property (nonatomic, readwrite, retain) NSOperationQueue* networkOperationQueue; // Default: [Nimbus networkOperationQueue]
+@property (nonatomic, readwrite, NI_STRONG) NIImageMemoryCache* imageMemoryCache;    // Default: [Nimbus imageMemoryCache]
+@property (nonatomic, readwrite, NI_STRONG) NSOperationQueue* networkOperationQueue; // Default: [Nimbus networkOperationQueue]
 
 @property (nonatomic, readwrite, assign) NSTimeInterval maxAge;     // Default: 0
-
-@property (nonatomic, readwrite, copy) NSString* memoryCachePrefix; // Default: nil
-@property (nonatomic, readonly, copy) NSString* lastPathToNetworkImage;
 
 #pragma mark Requesting a Network Image
 
@@ -131,13 +108,13 @@ typedef enum {
 
 #pragma mark Delegation
 
-@property (nonatomic, readwrite, assign) id<NINetworkImageViewDelegate> delegate;
+@property (nonatomic, readwrite, NI_WEAK) id<NINetworkImageViewDelegate> delegate;
 
 #pragma mark Subclassing
 
 - (void)networkImageViewDidStartLoading;
 - (void)networkImageViewDidLoadImage:(UIImage *)image;
-- (void)networkImageViewDidFailToLoad:(NSError *)error;
+- (void)networkImageViewDidFailWithError:(NSError *)error;
 
 @end
 
@@ -145,7 +122,7 @@ typedef enum {
 /**
  * The image view delegate used to inform of state changes.
  *
- *      @ingroup Network-Image-User-Interface
+ *      @ingroup NimbusNetworkImage
  */
 @protocol NINetworkImageViewDelegate <NSObject>
 @optional
@@ -163,7 +140,12 @@ typedef enum {
 /**
  * The asynchronous download failed.
  */
-- (void)networkImageViewDidFailLoad:(NINetworkImageView *)imageView;
+- (void)networkImageView:(NINetworkImageView *)imageView didFailWithError:(NSError *)error;
+
+/**
+ * The progress of the download.
+ */
+- (void)networkImageView:(NINetworkImageView *)imageView readBytes:(long long)readBytes totalBytes:(long long)totalBytes;
 
 @end
 
@@ -171,7 +153,7 @@ typedef enum {
  * Flags for modifying the way cropping is handled when scaling images to fit or fill.
  *
  *      @enum NINetworkImageViewScaleOptions
- *      @ingroup Network-Image-User-Interface
+ *      @ingroup NimbusNetworkImage
  *
  * By default the network image view will behave in the following way for these content modes:
  *
@@ -517,22 +499,6 @@ typedef enum {
  */
 
 /**
- * A prefix for the memory cache key.
- *
- * Prefixed to the memory cache key when looking for and storing this image in the memory cache.
- *
- * This makes it possible to keep multiple versions of a network image from the same url in
- * memory cropped and/or resized using different parameters. This can be useful if you're
- * downloading a high resolution photo and using that same photo in various locations with
- * different presentation requirements (a table view 50x50 icon and a larger 300x200 thumbnail
- * for example).
- *
- * By default this is nil.
- *
- *      @fn NINetworkImageView::memoryCachePrefix
- */
-
-/**
  * The last path assigned to the image view.
  *
  * This property may be used to avoid setting the network path repeatedly and clobbering
@@ -686,5 +652,5 @@ typedef enum {
 /**
  * A network request failed to load.
  *
- *      @fn NINetworkImageView::networkImageViewDidFailToLoad:
+ *      @fn NINetworkImageView::networkImageViewDidFailWithError:
  */

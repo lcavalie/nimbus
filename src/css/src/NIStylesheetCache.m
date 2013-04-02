@@ -19,6 +19,9 @@
 #import "NIStylesheet.h"
 #import "NimbusCore.h"
 
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,15 +29,6 @@
 @implementation NIStylesheetCache
 
 @synthesize pathPrefix = _pathPrefix;
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)dealloc {
-  NI_RELEASE_SAFELY(_pathToStylesheet);
-  NI_RELEASE_SAFELY(_pathPrefix);
-
-  [super dealloc];
-}
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,7 +54,7 @@
   NIStylesheet* stylesheet = [_pathToStylesheet objectForKey:path];
 
   if (nil == stylesheet) {
-    stylesheet = [[[NIStylesheet alloc] init] autorelease];
+    stylesheet = [[NIStylesheet alloc] init];
     if (loadFromDisk) {
       BOOL didSucceed = [stylesheet loadFromPath:path
                                       pathPrefix:_pathPrefix];

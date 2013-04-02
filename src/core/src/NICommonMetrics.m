@@ -18,6 +18,15 @@
 
 #import "NISDKAvailability.h"
 
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+CGFloat NIMinimumTapDimension(void) {
+  return 44;
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 CGFloat NIToolbarHeightForOrientation(UIInterfaceOrientation orientation) {
@@ -25,7 +34,7 @@ CGFloat NIToolbarHeightForOrientation(UIInterfaceOrientation orientation) {
           ? 44
           : (UIInterfaceOrientationIsPortrait(orientation)
              ? 44
-             : 33));;
+             : 33));
 }
 
 

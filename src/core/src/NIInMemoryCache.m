@@ -22,11 +22,15 @@
 
 #import <UIKit/UIKit.h>
 
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
+
 @interface NIMemoryCache()
-
-@property (nonatomic, readwrite, retain) NSMutableDictionary* cacheMap;
-@property (nonatomic, readwrite, retain) NILinkedList*        lruCacheObjects;
-
+// Mapping from a name (usually a URL) to an internal object.
+@property (nonatomic, readwrite, NI_STRONG) NSMutableDictionary* cacheMap;
+// A linked list of least recently used cache objects. Most recently used is the tail.
+@property (nonatomic, readwrite, NI_STRONG) NILinkedList* lruCacheObjects;
 @end
 
 
@@ -35,16 +39,7 @@
  *
  * Used in expiration calculations and for storing the actual cache object.
  */
-@interface NIMemoryCacheInfo : NSObject {
-@private
-  NSString* _name;
-  id        _object;
-  NSDate*   _expirationDate;
-  NSDate*   _lastAccessTime;
-
-  // Keep tabs on the location of the lru object so that we can move it quickly.
-  NILinkedListLocation* _lruLocation;
-}
+@interface NIMemoryCacheInfo : NSObject
 
 /**
  * @brief The name used to store this object in the cache.
@@ -54,12 +49,12 @@
 /**
  * @brief The object stored in the cache.
  */
-@property (nonatomic, readwrite, retain) id object;
+@property (nonatomic, readwrite, NI_STRONG) id object;
 
 /**
  * @brief The date after which the image is no longer valid and should be removed from the cache.
  */
-@property (nonatomic, readwrite, retain) NSDate* expirationDate;
+@property (nonatomic, readwrite, NI_STRONG) NSDate* expirationDate;
 
 /**
  * @brief The last time this image was accessed.
@@ -69,12 +64,12 @@
  * images. When the memory limit is reached, we sort the cache based on the last access times and
  * then prune images until we're under the memory limit again.
  */
-@property (nonatomic, readwrite, retain) NSDate* lastAccessTime;
+@property (nonatomic, readwrite, NI_STRONG) NSDate* lastAccessTime;
 
 /**
  * @brief The location of this object in the least-recently used linked list.
  */
-@property (nonatomic, readwrite, assign) NILinkedListLocation* lruLocation;
+@property (nonatomic, readwrite, NI_STRONG) NILinkedListLocation* lruLocation;
 
 /**
  * @brief Determine whether this cache entry has past its expiration date.
@@ -100,11 +95,6 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)dealloc {
   [[NSNotificationCenter defaultCenter] removeObserver:self];
-
-  NI_RELEASE_SAFELY(_cacheMap);
-  NI_RELEASE_SAFELY(_lruCacheObjects);
-
-  [super dealloc];
 }
 
 
@@ -131,6 +121,19 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+- (NSString *)description {
+  return [NSString stringWithFormat:
+          @"<%@"
+          @" lruObjects: %@"
+          @" cache map: %@"
+          @">",
+          [super description],
+          self.lruCacheObjects,
+          self.cacheMap];
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma mark -
 #pragma mark Internal Methods
@@ -140,18 +143,18 @@
 - (void)updateAccessTimeForInfo:(NIMemoryCacheInfo *)info {
   NIDASSERT(nil != info);
   if (nil == info) {
-    return;
+    return; // COV_NF_LINE
   }
   info.lastAccessTime = [NSDate date];
 
-  [_lruCacheObjects removeObjectAtLocation:info.lruLocation];
-  info.lruLocation = [_lruCacheObjects addObject:info];
+  [self.lruCacheObjects removeObjectAtLocation:info.lruLocation];
+  info.lruLocation = [self.lruCacheObjects addObject:info];
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (NIMemoryCacheInfo *)cacheInfoForName:(NSString *)name {
-  return [_cacheMap objectForKey:name];
+  return [self.cacheMap objectForKey:name];
 }
 
 
@@ -165,14 +168,14 @@
   // Storing in the cache counts as an access of the object, so we update the access time.
   [self updateAccessTimeForInfo:info];
 
-  [self willSetObject: info.object
-             withName: name
-       previousObject: [self cacheInfoForName:name].object];
+  if ([self willSetObject:info.object
+                 withName:name
+           previousObject:[self cacheInfoForName:name].object]) {
+    [self.cacheMap setObject:info forKey:name];
 
-  [_cacheMap setObject:info forKey:name];
-
-  [self didSetObject: info.object
-            withName: name];
+    [self didSetObject:info.object
+              withName:name];
+  }
 }
 
 
@@ -183,9 +186,11 @@
     return;
   }
 
-  [self willRemoveObject:[self cacheInfoForName:name].object withName:name];
+  NIMemoryCacheInfo* cacheInfo = [self cacheInfoForName:name];
+  [self willRemoveObject:cacheInfo.object withName:name];
 
-  [_cacheMap removeObjectForKey:name];
+  [self.lruCacheObjects removeObjectAtLocation:cacheInfo.lruLocation];
+  [self.cacheMap removeObjectForKey:name];
 }
 
 
@@ -196,8 +201,9 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)willSetObject:(id)object withName:(NSString *)name previousObject:(id)previousObject {
-  // No-op
+- (BOOL)willSetObject:(id)object withName:(NSString *)name previousObject:(id)previousObject {
+  // Allow anything to be stored.
+  return YES;
 }
 
 
@@ -243,7 +249,7 @@
 
   // Create a new cache entry.
   if (nil == info) {
-    info = [[[NIMemoryCacheInfo alloc] init] autorelease];
+    info = [[NIMemoryCacheInfo alloc] init];
     info.name = name;
   }
 
@@ -276,7 +282,7 @@
     }
   }
 
-  return [[object retain] autorelease];
+  return object;
 }
 
 
@@ -339,18 +345,26 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)removeAllObjectsWithPrefix:(NSString *)prefix {
+  for (NSString* key in [self.cacheMap copy]) {
+    if ([key hasPrefix:prefix]) {
+      [self removeObjectWithName:key];
+    }
+  }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)removeAllObjects {
-  NI_RELEASE_SAFELY(_cacheMap);
-  NI_RELEASE_SAFELY(_lruCacheObjects);
-  _cacheMap = [[NSMutableDictionary alloc] init];
-  _lruCacheObjects = [[NILinkedList alloc] init];
+  self.cacheMap = [[NSMutableDictionary alloc] init];
+  self.lruCacheObjects = [[NILinkedList alloc] init];
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)reduceMemoryUsage {
   // Copy the cache map because it's likely that we're going to modify it.
-  NSDictionary* cacheMap = [_cacheMap copy];
+  NSDictionary* cacheMap = [self.cacheMap copy];
 
   // Iterate over the copied cache map (which will not be modified).
   for (id name in cacheMap) {
@@ -360,13 +374,13 @@
       [self removeCacheInfoForName:name];
     }
   }
-  NI_RELEASE_SAFELY(cacheMap);
+  cacheMap = nil;
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (NSUInteger)count {
-  return [_cacheMap count];
+  return [self.cacheMap count];
 }
 
 
@@ -386,21 +400,26 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)dealloc {
-  NI_RELEASE_SAFELY(_name);
-  NI_RELEASE_SAFELY(_object);
-  NI_RELEASE_SAFELY(_expirationDate);
-  NI_RELEASE_SAFELY(_lastAccessTime);
-  _lruLocation = nil;
-
-  [super dealloc];
+- (BOOL)hasExpired {
+  return (nil != _expirationDate
+          && [[NSDate date] timeIntervalSinceDate:_expirationDate] >= 0);
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (BOOL)hasExpired {
-  return (nil != _expirationDate
-          && [[NSDate date] timeIntervalSinceDate:_expirationDate] >= 0);
+- (NSString *)description {
+  return [NSString stringWithFormat:
+          @"<%@"
+          @" name: %@"
+          @" object: %@"
+          @" expiration date: %@"
+          @" last access time: %@"
+          @">",
+          [super description],
+          self.name,
+          self.object,
+          self.expirationDate,
+          self.lastAccessTime];
 }
 
 
@@ -411,10 +430,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 @interface NIImageMemoryCache()
-
-// Internally only.
 @property (nonatomic, readwrite, assign) NSUInteger numberOfPixels;
-
 @end
 
 
@@ -466,14 +482,16 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)willSetObject:(id)object withName:(NSString *)name previousObject:(id)previousObject {
+- (BOOL)willSetObject:(id)object withName:(NSString *)name previousObject:(id)previousObject {
   NIDASSERT(nil == object || [object isKindOfClass:[UIImage class]]);
   if (![object isKindOfClass:[UIImage class]]) {
-    return;
+    return NO;
   }
 
   self.numberOfPixels -= [self numberOfPixelsUsedByImage:previousObject];
   self.numberOfPixels += [self numberOfPixelsUsedByImage:object];
+
+  return YES;
 }
 
 
@@ -498,11 +516,8 @@
 - (void)willRemoveObject:(id)object withName:(NSString *)name {
   NIDASSERT(nil == object || [object isKindOfClass:[UIImage class]]);
   if (nil == object || ![object isKindOfClass:[UIImage class]]) {
-    return;
+    return; // COV_NF_LINE
   }
-
-  NIMemoryCacheInfo* info = [self cacheInfoForName:name];
-  [self.lruCacheObjects removeObjectAtLocation:info.lruLocation];
 
   self.numberOfPixels -= [self numberOfPixelsUsedByImage:object];
 }

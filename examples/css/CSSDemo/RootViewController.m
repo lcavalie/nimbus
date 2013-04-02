@@ -15,24 +15,24 @@
 //
 
 #import "RootViewController.h"
+#import "UIView+NIStyleable.h"
+#import "NIUserInterfaceString.h"
+#import "NIInvocationMethods.h"
+#import "NITextField.h"
 
 #import "AppDelegate.h"
-
-static CGFloat squareSize = 200;
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 @implementation RootViewController
-
+{
+  BOOL animationToggle;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)dealloc {
-  NI_RELEASE_SAFELY(_dom);
   [[NSNotificationCenter defaultCenter] removeObserver:self];
-
-  [super dealloc];
 }
 
 
@@ -41,8 +41,9 @@ static CGFloat squareSize = 200;
   if ((self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil])) {
     NIStylesheetCache* stylesheetCache =
     [(AppDelegate *)[UIApplication sharedApplication].delegate stylesheetCache];
-    NIStylesheet* stylesheet = [stylesheetCache stylesheetWithPath:@"root/root.css"];
-    _dom = [[NIDOM alloc] initWithStylesheet:stylesheet];
+    NIStylesheet* stylesheet = [stylesheetCache stylesheetWithPath:@"css/root/root.css"];
+    NIStylesheet* common = [stylesheetCache stylesheetWithPath:@"css/common.css"];
+    _dom = [NIDOM domWithStylesheet:stylesheet andParentStyles:common];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(stylesheetDidChange)
                                                  name:NIStylesheetDidChangeNotification
@@ -54,80 +55,60 @@ static CGFloat squareSize = 200;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)layoutSubviews {
-  CGSize labelSize = CGSizeZero;
-  
-  if (_testLabel.numberOfLines == 0) {
-    labelSize = [_testLabel.text sizeWithFont:_testLabel.font
-                            constrainedToSize:CGSizeMake(squareSize - 20, squareSize - 20)
-                                lineBreakMode:_testLabel.lineBreakMode];
-  } else {
-    labelSize = CGSizeMake(squareSize - 20, _testLabel.numberOfLines * _testLabel.font.lineHeight);
-  }
-
-  CGSize activitySize = _activityIndicator.frame.size;
-  labelSize.height = MIN(squareSize - 40 - activitySize.height - 10, labelSize.height);
-
-  _testLabel.frame = CGRectMake(floorf((squareSize - labelSize.width) / 2),
-                                MAX(20 + activitySize.height + 10,
-                                    floorf((squareSize - labelSize.height) / 2)),
-                                labelSize.width, labelSize.height);
-
-  _activityIndicator.frame = CGRectMake(floorf((squareSize - _activityIndicator.frame.size.width) / 2),
-                                        CGRectGetMinY(_testLabel.frame) - 10 - activitySize.height,
-                                        activitySize.width, activitySize.height);
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)loadView {
   [super loadView];
-  
-  _backgroundView = [[UIView alloc] init];
-  UIViewAutoresizing flexibleMargins = (UIViewAutoresizingFlexibleTopMargin
-                                        | UIViewAutoresizingFlexibleRightMargin
-                                        | UIViewAutoresizingFlexibleLeftMargin
-                                        | UIViewAutoresizingFlexibleBottomMargin);
-  _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:
-                        UIActivityIndicatorViewStyleWhiteLarge];
-  [_activityIndicator sizeToFit];
-  [_activityIndicator startAnimating];
 
-  CGSize boundsSize = self.view.bounds.size;
-  _backgroundView.frame = CGRectMake(floorf((boundsSize.width - squareSize) / 2),
-                                     floorf((boundsSize.height - squareSize) / 2),
-                                     squareSize, squareSize);
-
-  _testLabel = [[UILabel alloc] init];
-  _testLabel.text = @"Chameleon changes skins in real time.\n\nStop compiling.\nStart building.";
-  
-  _testLabel.autoresizingMask = flexibleMargins;
-  _backgroundView.autoresizingMask = flexibleMargins;
-  _activityIndicator.autoresizingMask = flexibleMargins;
-
-  [self.view addSubview:_backgroundView];
-  [_backgroundView addSubview:_activityIndicator];
-  [_backgroundView addSubview:_testLabel];
-
-  // Register our views with the DOM.
   [_dom registerView:self.view withCSSClass:@"background"];
-  [_dom registerView:_testLabel];
-  [_dom registerView:_backgroundView withCSSClass:@"noticeBox"];
+  [self.view buildSubviews:@[
+   _backgroundView = [[UIView alloc] init], @".noticeBox",
+   @[
+      _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge],
+      [[UILabel alloc] init], @".titleLabel"
+   ],
+   [[UILabel alloc] init], @".rightMiddleLabel", NILocalizedStringWithDefault(@"RightLabel", @"Right Middle Label"),
+   [[UILabel alloc] init], @".bottomLabel", NILocalizedStringWithDefault(@"BottomLabel", @"Bottom Left Label"),
+   _button = [UIButton buttonWithType:UIButtonTypeCustom], NIInvocationWithInstanceTarget(self,@selector(buttonPress)), NILocalizedStringWithDefault(@"TestButton", @"Test Button"), @"#TestButton",
+   [[NITextField alloc] init], @".textField"
+   ]
+   inDOM:_dom];
   
-  [self layoutSubviews];
+  for (int i = 1; i <= 7; i++) {
+    UIView *box = [[UIView alloc] init];
+    [self.view addSubview:box];
+    [_dom registerView:box withCSSClass:@"colorBox" andId:[NSString stringWithFormat:@"box%d",i]];
+  }
+  [_activityIndicator startAnimating];
+  
+  NSLog(@"%@", [_dom descriptionForAllViews]);
 }
 
+-(void)viewWillLayoutSubviews
+{
+  [super viewWillLayoutSubviews];
+  [_dom refresh];
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)viewDidUnload {
   [_dom unregisterAllViews];
+  
+  _activityIndicator = nil;
+  _backgroundView = nil;
+  _testLabel = nil;
 }
 
+-(void)buttonPress
+{
+  animationToggle = !animationToggle;
+  [_dom removeCssClass:animationToggle?@"noticeBox":@"noticeBoxEndpoint" fromView: _backgroundView];
+  [UIView animateWithDuration:.5 animations:^{
+    [_dom addCssClass:animationToggle?@"noticeBoxEndpoint":@"noticeBox" toView:_backgroundView];
+  }];
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)stylesheetDidChange {
   [_dom refresh];
-  [self layoutSubviews];
 }
 
 @end

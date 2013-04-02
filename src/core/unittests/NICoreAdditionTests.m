@@ -37,65 +37,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma mark -
-#pragma mark NSData Additions
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)testNSData_md5Hash {
-  const char* bytes = "nimbus";
-  NSData* data = [[NSData alloc] initWithBytes:bytes length:strlen(bytes)];
-
-  STAssertTrue([[data md5Hash] isEqualToString:@"0e78d66f33c484a3c3b36d69bd3114cf"],
-               @"MD5 hashes don't match.");
-
-  NI_RELEASE_SAFELY(data);
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)testNSData_sha1Hash {
-  const char* bytes = "nimbus";
-  NSData* data = [[NSData alloc] initWithBytes:bytes length:strlen(bytes)];
-
-  STAssertTrue([[data sha1Hash] isEqualToString:@"c1b42d95fd18ad8a56d4fd7bbb4105952620d857"],
-               @"SHA1 hashes don't match.");
-
-  NI_RELEASE_SAFELY(data);
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////
-#pragma mark -
 #pragma mark NSString Additions
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)testNSString_isWhitespace {
-  // From the Apple docs:
-  // Returns a character set containing only the whitespace characters space (U+0020) and tab
-  // (U+0009) and the newline and nextline characters (U+000A–U+000D, U+0085).
-  STAssertTrue([@"" isWhitespaceAndNewlines], @"Empty string should be whitespace.");
-  STAssertTrue([@" " isWhitespaceAndNewlines], @"Space character should be whitespace.");
-  STAssertTrue([@"\t" isWhitespaceAndNewlines], @"Tab character should be whitespace.");
-  STAssertTrue([@"\n" isWhitespaceAndNewlines], @"Newline character should be whitespace.");
-  STAssertTrue([@"\r" isWhitespaceAndNewlines], @"Carriage return character should be whitespace.");
-
-  // Unicode whitespace
-  for (int unicode = 0x000A; unicode <= 0x000D; ++unicode) {
-    NSString* str = [NSString stringWithFormat:@"%C", unicode];
-    STAssertTrue([str isWhitespaceAndNewlines],
-                 @"Unicode string #%X should be whitespace.", unicode);
-  }
-
-  NSString* str = [NSString stringWithFormat:@"%C", 0x0085];
-  STAssertTrue([str isWhitespaceAndNewlines], @"Unicode string should be whitespace.");
-
-  STAssertTrue([@" \t\r\n" isWhitespaceAndNewlines], @"Empty string should be whitespace.");
-
-  STAssertTrue(![@"a" isWhitespaceAndNewlines], @"Text should not be whitespace.");
-  STAssertTrue(![@" \r\n\ta\r\n " isWhitespaceAndNewlines], @"Text should not be whitespace.");
-}
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,6 +156,20 @@
   STAssertTrue([@"3.0a"  versionStringCompare:@"3.0a1"]  == NSOrderedAscending, @"empty alpha");
   STAssertTrue([@"3.02"  versionStringCompare:@"3.03"]   == NSOrderedAscending, @"point diff");
   STAssertTrue([@"3.0.2" versionStringCompare:@"3.0.3"]  == NSOrderedAscending, @"point diff");
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)testNSString_md5Hash {
+  STAssertTrue([[@"nimbus" md5Hash] isEqualToString:@"0e78d66f33c484a3c3b36d69bd3114cf"],
+               @"MD5 hashes don't match.");
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)testNSString_sha1Hash {
+  STAssertTrue([[@"nimbus" sha1Hash] isEqualToString:@"c1b42d95fd18ad8a56d4fd7bbb4105952620d857"],
+               @"SHA1 hashes don't match.");
 }
 
 

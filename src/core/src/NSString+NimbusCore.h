@@ -17,15 +17,10 @@
 //
 
 #import <Foundation/Foundation.h>
-
 #import <UIKit/UIKit.h>
 
 // Documentation for these additions is found in the .m file.
 @interface NSString (NimbusCore)
-
-#pragma mark Checking String Contents
-
-- (BOOL)isWhitespaceAndNewlines;
 
 #pragma mark Display
 
@@ -47,6 +42,5 @@
 
 @property (nonatomic, readonly) NSString* md5Hash;
 @property (nonatomic, readonly) NSString* sha1Hash;
-
 
 @end

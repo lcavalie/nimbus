@@ -19,8 +19,7 @@
 static UIEdgeInsets kWellPadding = {0}; // see +initialize
 
 @interface CaptionedPhotoView ()
-@property (nonatomic, readwrite, assign) UIView* captionWell;
-@property (nonatomic, readwrite, assign) UILabel* captionLabel;
+@property (nonatomic, readwrite, retain) UILabel* captionLabel;
 @end
 
 
@@ -42,11 +41,11 @@ static UIEdgeInsets kWellPadding = {0}; // see +initialize
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (id)initWithFrame:(CGRect)frame {
   if ((self = [super initWithFrame:frame])) {
-    _captionWell = [[[UIView alloc] initWithFrame:self.bounds] autorelease];
+    _captionWell = [[UIView alloc] initWithFrame:self.bounds];
     _captionWell.autoresizingMask = (UIViewAutoresizingFlexibleWidth
                                      | UIViewAutoresizingFlexibleTopMargin);
 
-    _captionLabel = [[[UILabel alloc] initWithFrame:self.bounds] autorelease];
+    _captionLabel = [[UILabel alloc] initWithFrame:self.bounds];
     _captionLabel.backgroundColor = [UIColor clearColor];
     _captionLabel.lineBreakMode = UILineBreakModeTailTruncation;
     _captionLabel.numberOfLines = 0;
@@ -55,7 +54,7 @@ static UIEdgeInsets kWellPadding = {0}; // see +initialize
     _captionLabel.shadowOffset = CGSizeMake(0, 1);
     _captionLabel.shadowColor = [UIColor colorWithWhite:0 alpha:0.5];
 
-    UIView* topBorder = [[[UIView alloc] initWithFrame:CGRectZero] autorelease];
+    UIView* topBorder = [[UIView alloc] initWithFrame:CGRectZero];
     topBorder.frame = CGRectMake(0, 0, self.bounds.size.width, 1);
     topBorder.autoresizingMask = (UIViewAutoresizingFlexibleBottomMargin
                                   | UIViewAutoresizingFlexibleWidth);
@@ -81,7 +80,7 @@ static UIEdgeInsets kWellPadding = {0}; // see +initialize
                                          constrainedToSize:CGSizeMake(availableWidth, CGFLOAT_MAX)
                                              lineBreakMode:self.captionLabel.lineBreakMode];
   CGFloat wellHeight = labelSize.height + kWellPadding.top + kWellPadding.bottom;
-  self.captionWell.frame = CGRectMake(0, self.bounds.size.height - wellHeight,
+  self.captionWell.frame = CGRectMake(0, self.bounds.size.height - wellHeight - NIToolbarHeightForOrientation(NIInterfaceOrientation()),
                                       self.bounds.size.width, wellHeight);
   self.captionLabel.frame = UIEdgeInsetsInsetRect(self.captionWell.bounds, kWellPadding);
 }

@@ -17,11 +17,13 @@
 // limitations under the License.
 //
 
+#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+
+#import "NIPreprocessorMacros.h" /* for NI_WEAK */
+
 /**
  * A simple web view controller implementation with a toolbar.
- *
- *      @ingroup NimbusWebController
- *
  *
  * <h2>Subclassing</h2>
  *
@@ -70,67 +72,122 @@
  * @code
  *  [webController setToolbarTintColor:[UIColor blackColor]];
  * @endcode
+ *
+ *      @ingroup NimbusWebController
+ */
+@interface NIWebController : UIViewController <UIWebViewDelegate, UIActionSheetDelegate>
+
+// Designated initializer.
+- (id)initWithRequest:(NSURLRequest *)request;
+- (id)initWithURL:(NSURL *)URL;
+
+- (NSURL *)URL;
+
+- (void)openURL:(NSURL*)URL;
+- (void)openRequest:(NSURLRequest*)request;
+- (void)openHTMLString:(NSString*)htmlString baseURL:(NSURL*)baseUrl;
+
+@property (nonatomic, readwrite, assign, getter = isToolbarHidden) BOOL toolbarHidden;
+@property (nonatomic, readwrite, NI_WEAK) UIColor* toolbarTintColor;
+
+@property (nonatomic, readonly, NI_STRONG) UIWebView* webView;
+
+// Subclassing
+- (BOOL)shouldPresentActionSheet:(UIActionSheet *)actionSheet;
+@property (nonatomic, readwrite, NI_STRONG) NSURL* actionSheetURL;
+
+@end
+
+/** @name Creating a Web Controller */
+
+/**
+ * Initializes a newly allocated web controller with a given request.
+ *
+ * Once the controller is presented it will begin loading the given request.
+ *
+ * This is the designated initializer.
+ *
+ *      @fn NIWebController::initWithRequest:
  */
 
-#import <Foundation/Foundation.h>
-#import <UIKit/UIKit.h>
+/**
+ * Initializes a newly allocated web controller with a given URL to request.
+ *
+ * Once the controller is presented it will begin loading the given URL.
+ *
+ *      @fn NIWebController::initWithURL:
+ */
 
-@interface NIWebController : UIViewController <
-  UIWebViewDelegate,
-  UIActionSheetDelegate > {
-@protected
-  // Views
-  UIWebView*        _webView;
-  UIToolbar*        _toolbar;
-  UIActionSheet*    _actionSheet;
-  
-  // Toolbar buttons
-  UIBarButtonItem*  _backButton;
-  UIBarButtonItem*  _forwardButton;
-  UIBarButtonItem*  _refreshButton;
-  UIBarButtonItem*  _stopButton;
-  UIBarButtonItem*  _actionButton;
-  UIBarButtonItem*  _activityItem;
-
-  NSURL*            _actionSheetURL;
-  NSURL*            _loadingURL;
-}
+/** @name Accessing the Request Attributes */
 
 /**
  * The current web view URL.
  *
- * If the web view is currently loading a URL then the loading URL is returned instead.
+ * If the web view is currently loading a URL then the loading URL is returned.
+ * Otherwise this will be the last URL that was loaded.
+ *
+ *      @fn NIWebController::URL:
  */
-- (NSURL *)URL;
+
+/** @name Loading a Request */
 
 /**
- * Opens the given URL in the web view.
+ * Loads a request with the given URL in the web view.
+ *
+ *      @fn NIWebController::openURL:
  */
-- (void)openURL:(NSURL*)URL;
 
 /**
  * Load the given request using UIWebView's loadRequest:.
  *
  *      @param request  A URL request identifying the location of the content to load.
- */
-- (void)openRequest:(NSURLRequest*)request;
-
-/**
- * Sets the toolbar to the given color.
- */
-- (void)setToolbarTintColor:(UIColor*)color;
-
-/**
- * This message is send to the receiver in response to the user clicking the action toolbar button.
  *
- * You can provide your own implementation in your subclass and customize the @c actionSheet
+ *      @fn NIWebController::openRequest:
+ */
+
+/**
+ * Load the given request using UIWebView's loadHTMLString:baseURL:.
+ *
+ *      @param htmlString  The content for the main page.
+ *      @param baseUrl  The base URL for the content.
+ *
+ *      @fn NIWebController::openHTMLString:baseURL:
+ */
+
+/** @name Accessing the Toolbar */
+
+/**
+ * The visibility of the toolbar.
+ *
+ * If the toolbar is hidden then the web view will take up the controller's entire view.
+ *
+ *      @fn NIWebController::toolbarHidden
+ */
+
+/**
+ * The tint color of the toolbar.
+ *
+ *      @fn NIWebController::toolbarTintColor
+ */
+
+/** @name Accessing the Web View */
+
+/**
+ * The internal web view.
+ *
+ *      @fn NIWebController::webView
+ */
+
+/** @name Subclassing the Web Controller */
+
+/**
+ * This message is called in response to the user clicking the action toolbar button.
+ *
+ * You can provide your own implementation in your subclass and customize the actionSheet
  * that is shown to the user or even cancel the presentation of the @c actionSheet by
- * returning @c NO from your implementation.
+ * returning NO from your implementation.
  *
- * @param actionSheet The UIActionSheet that will be presented to the user.
- *
- * @return @c YES to present the @p actionSheet, @c NO if you want to perform a custom action.
+ *      @param actionSheet The UIActionSheet that will be presented to the user.
+ *      @return YES to present the actionSheet, NO if you want to perform a custom action.
+ *      @fn NIWebController::shouldPresentActionSheet:
  */
-- (BOOL)shouldPresentActionSheet:(UIActionSheet *)actionSheet;
-
-@end

@@ -20,6 +20,9 @@
 
 #import "NimbusCore.h"
 
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "Nimbus requires ARC support."
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,21 +45,10 @@
 - (void)shutdown_NIToolbarPhotoViewController {
   _toolbar = nil;
   _photoAlbumView = nil;
-
-  NI_RELEASE_SAFELY(_nextButton);
-  NI_RELEASE_SAFELY(_previousButton);
-
-  NI_RELEASE_SAFELY(_photoScrubberView);
-
-  NI_RELEASE_SAFELY(_tapGesture);
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)dealloc {
-  [self shutdown_NIToolbarPhotoViewController];
-
-  [super dealloc];
+  _nextButton = nil;
+  _previousButton = nil;
+  _photoScrubberView = nil;
+  _tapGesture = nil;
 }
 
 
@@ -102,13 +94,13 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)updateToolbarItems {
   UIBarItem* flexibleSpace =
-  [[[UIBarButtonItem alloc] initWithBarButtonSystemItem: UIBarButtonSystemItemFlexibleSpace
+  [[UIBarButtonItem alloc] initWithBarButtonSystemItem: UIBarButtonSystemItemFlexibleSpace
                                                  target: nil
-                                                 action: nil] autorelease];
+                                                 action: nil];
 
   if ([self isScrubberEnabled]) {
-    NI_RELEASE_SAFELY(_nextButton);
-    NI_RELEASE_SAFELY(_previousButton);
+    _nextButton = nil;
+    _previousButton = nil;
 
     if (nil == _photoScrubberView) {
       CGRect scrubberFrame = CGRectMake(0, 0,
@@ -121,7 +113,7 @@
     }
 
     UIBarButtonItem* scrubberItem =
-    [[[UIBarButtonItem alloc] initWithCustomView:self.photoScrubberView] autorelease];
+    [[UIBarButtonItem alloc] initWithCustomView:self.photoScrubberView];
     self.toolbar.items = [NSArray arrayWithObjects:
                           flexibleSpace, scrubberItem, flexibleSpace,
                           nil];
@@ -129,7 +121,7 @@
     [_photoScrubberView setSelectedPhotoIndex:self.photoAlbumView.centerPageIndex];
     
   } else {
-    NI_RELEASE_SAFELY(_photoScrubberView);
+    _photoScrubberView = nil;
 
     if (nil == _nextButton) {
       UIImage* nextIcon = [UIImage imageWithContentsOfFile:
@@ -182,6 +174,8 @@
 - (void)loadView {
   [super loadView];
 
+  self.view.backgroundColor = [UIColor blackColor];
+
   CGRect bounds = self.view.bounds;
 
   // Toolbar Setup
@@ -190,7 +184,7 @@
   CGRect toolbarFrame = CGRectMake(0, bounds.size.height - toolbarHeight,
                                    bounds.size.width, toolbarHeight);
 
-  _toolbar = [[[UIToolbar alloc] initWithFrame:toolbarFrame] autorelease];
+  _toolbar = [[UIToolbar alloc] initWithFrame:toolbarFrame];
   _toolbar.barStyle = UIBarStyleBlack;
   _toolbar.translucent = self.toolbarIsTranslucent;
   _toolbar.autoresizingMask = (UIViewAutoresizingFlexibleWidth
@@ -204,7 +198,7 @@
   if (!self.toolbarIsTranslucent) {
     photoAlbumFrame = NIRectContract(bounds, 0, toolbarHeight);
   }
-  _photoAlbumView = [[[NIPhotoAlbumScrollView alloc] initWithFrame:photoAlbumFrame] autorelease];
+  _photoAlbumView = [[NIPhotoAlbumScrollView alloc] initWithFrame:photoAlbumFrame];
   _photoAlbumView.autoresizingMask = (UIViewAutoresizingFlexibleWidth
                                       | UIViewAutoresizingFlexibleHeight);
   _photoAlbumView.delegate = self;
@@ -231,8 +225,6 @@
 - (void)viewWillAppear:(BOOL)animated {
   [super viewWillAppear:animated];
 
-  [NINavigationAppearance pushAppearanceForNavigationController:self.navigationController];
-
   [[UIApplication sharedApplication] setStatusBarStyle: (NIIsPad()
                                                          ? UIStatusBarStyleBlackOpaque
                                                          : UIStatusBarStyleBlackTranslucent)
@@ -244,14 +236,6 @@
 
   _previousButton.enabled = [self.photoAlbumView hasPrevious];
   _nextButton.enabled = [self.photoAlbumView hasNext];
-}
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)viewWillDisappear:(BOOL)animated {
-  [super viewWillDisappear:animated];
-
-  [NINavigationAppearance popAppearanceForNavigationController:self.navigationController animated:YES];
 }
 
 
@@ -289,6 +273,12 @@
     photoAlbumFrame.size.height = self.view.bounds.size.height - toolbarFrame.size.height;
     self.photoAlbumView.frame = photoAlbumFrame;
   }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+- (UIView *)rotatingFooterView {
+  return self.toolbar.hidden ? nil : self.toolbar;
 }
 
 
@@ -453,6 +443,12 @@
   self.previousButton.enabled = [self.photoAlbumView hasPrevious];
   self.nextButton.enabled = [self.photoAlbumView hasNext];
 
+  [self setChromeTitle];
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)setChromeTitle {
   self.title = [NSString stringWithFormat:@"%d of %d",
                 (self.photoAlbumView.centerPageIndex + 1),
                 self.photoAlbumView.numberOfPages];
@@ -504,7 +500,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)photoScrubberViewDidChangeSelection:(NIPhotoScrubberView *)photoScrubberView {
-  [self.photoAlbumView setCenterPageIndex:photoScrubberView.selectedPhotoIndex animated:NO];
+  [self.photoAlbumView moveToPageAtIndex:photoScrubberView.selectedPhotoIndex animated:NO];
 
   [self refreshChromeState];
 }
@@ -519,12 +515,16 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)didTapNextButton {
   [self.photoAlbumView moveToNextAnimated:self.animateMovingToNextAndPreviousPhotos];
+  
+  [self refreshChromeState];
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)didTapPreviousButton {
   [self.photoAlbumView moveToPreviousAnimated:self.animateMovingToNextAndPreviousPhotos];
+
+  [self refreshChromeState];
 }
 
 
